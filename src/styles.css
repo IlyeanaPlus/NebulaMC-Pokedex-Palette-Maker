@@ -52,7 +52,6 @@ body{
 .panel.panel-rules{ padding-top:12px; padding-bottom:12px; }
 
 /* Column C JSON panel — independent height; no forced 100% */
-.col-c{ /* no height:100% here */ }
 .panel.export.json-values{ display:flex; flex-direction:column; /* padding-bottom set inline or override below */ }
 
 /* Textarea look; no fixed height here (we set it inline for clarity) */
@@ -149,3 +148,51 @@ pre{ background:#0a1225; border:1px solid var(--border); border-radius:12px; pad
   image-rendering: pixelated;
   image-rendering: crisp-edges;
 }
+
+/* Header image */
+.header-image {
+  display: block;
+  margin: 0 auto;
+  width: auto;           /* keep natural width ratio */
+  max-width: 100%;       /* never overflow horizontally */
+
+  /* 👇 NEW: cap the vertical size */
+  max-height: 90px;     /* adjust until the header isn’t too tall */
+  height: auto;
+}
+
+
+/* Ko-fi button overlay */
+.kofi-button{
+  position:absolute;
+  right:10px;
+  bottom:10px;
+  display:inline-block;
+  text-decoration:none;
+}
+.kofi-img{
+  width:40px;           /* adjust size as needed */
+  height:auto;
+}
+
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: linear-gradient(180deg, #0d1730, #0b1328);
+  border-bottom: 1px solid var(--border);
+  height: 100px;     /* 👈 fixed header height */
+  padding: 0 16px;   /* keep horizontal padding */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.header-image {
+  display: block;
+  height: 100%;     /* 👈 fill the header vertically */
+  width: auto;      /* keep natural aspect ratio */
+  max-width: 100%;  /* don’t overflow horizontally on small screens */
+}
+
+

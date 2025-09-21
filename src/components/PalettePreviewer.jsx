@@ -5,7 +5,7 @@ export default function PalettePreviewer() {
   const [primary, setPrimary]     = useState({ r: 30, g: 116, b: 231, a: 1 })
   const [secondary, setSecondary] = useState({ r: 200, g: 215, b: 255, a: 1 })
   const [text, setText]           = useState({ r: 30, g: 116, b: 231, a: 1 })
-  const [headerLabel, setHeaderLabel] = useState('POKEDEX')
+  const [headerLabel, setHeaderLabel] = useState('Pokemon')
 
   const [enforceModRules, setEnforceModRules] = useState(true)
   const [lightenPct, setLightenPct]   = useState(22)
@@ -25,6 +25,8 @@ export default function PalettePreviewer() {
 
   // ----- Helpers -----
   const clamp = (v,min,max)=>Math.min(max,Math.max(min,v))
+  const clamp255 = v => clamp(Math.round(Number(v) || 0), 0, 255)
+
   const toRGBA = c => `rgba(${Math.round(c.r)}, ${Math.round(c.g)}, ${Math.round(c.b)}, ${Math.round((c.a??1)*100)/100})`
   const toHex  = c => `#${[c.r,c.g,c.b].map(v=>clamp(Math.round(v),0,255).toString(16).padStart(2,'0')).join('').toUpperCase()}`
   const hexToRgb = hex => {
@@ -71,17 +73,23 @@ export default function PalettePreviewer() {
   }
   const contrast=(c1,c2)=>{ const L1=relLum(c1), L2=relLum(c2); const [a,b]=L1>L2?[L1,L2]:[L2,L1]; return (a+0.05)/(b+0.05) }
 
+  // Helper once at top-level (if you don't already have one)
+  const hexToRgbFast = (hex) => {
+    const m = /^#?([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(hex)
+    return m ? { r: parseInt(m[1],16), g: parseInt(m[2],16), b: parseInt(m[3],16) } : null
+  };
+
   // ----- Rules -----
   useEffect(()=>{
     if(!enforceModRules) return
     const next=adjustHsl(primary,{ ds:satChange, dl:lightenPct })
     next.a=secondary.a
     setSecondary(next)
-  },[primary,lightenPct,satChange,enforceModRules])
+  },[primary,lightenPct,satChange,enforceModRules, secondary.a])
 
   useEffect(()=>{
-    if(enforceModRules) setText({ ...primary })
-  },[primary,enforceModRules])
+    if(enforceModRules) setText(prev => ({ ...prev, r:primary.r, g:primary.g, b:primary.b }))
+  },[primary.r, primary.g, primary.b, enforceModRules])
 
   const realignToRules=()=>{
     const defaultLighten = 22
@@ -91,7 +99,7 @@ export default function PalettePreviewer() {
     const next = adjustHsl(primary,{ ds: defaultSaturate, dl: defaultLighten })
     next.a = secondary.a
     setSecondary(next)
-    if(enforceModRules) setText({ ...primary })
+    if(enforceModRules) setText(prev => ({ ...prev, r:primary.r, g:primary.g, b:primary.b }))
   }
 
   // ----- Reference image -----
@@ -120,12 +128,12 @@ export default function PalettePreviewer() {
     const y=Math.floor((e.clientY-rect.top)*(cvs.height/rect.height))
     const {data}=cvs.getContext('2d').getImageData(x,y,1,1)
     const picked={ r:data[0], g:data[1], b:data[2], a:+(data[3]/255).toFixed(3) }
-    if(activeTarget==='primary') setPrimary(picked)
+    if(activeTarget==='primary')   setPrimary(picked)
     if(activeTarget==='secondary') setSecondary(picked)
-    if(activeTarget==='text') setText(picked)
+    if(activeTarget==='text')      setText(picked)
   }
 
-  // ----- CSS vars for preview -----
+  // ----- CSS vars & JSON -----
   const secondaryEdge=useMemo(()=>adjustHsl(secondary,{ dl:-8, ds:-5 }),[secondary])
   const primaryEdge=useMemo(()=>adjustHsl(primary,{ dl:-15, ds:-10 }),[primary])
   const cssVars=useMemo(()=>({
@@ -136,16 +144,15 @@ export default function PalettePreviewer() {
     ['--c-text']:toRGBA(text)
   }),[primary,primaryEdge,secondary,secondaryEdge,text])
 
-  // JSON export text
   const liveJSON=useMemo(()=>JSON.stringify({
-    primary:{r:Math.round(primary.r),g:Math.round(primary.g),b:Math.round(primary.b),a:1},
-    secondary:{r:Math.round(secondary.r),g:Math.round(secondary.g),b:Math.round(secondary.b),a:1},
-    text:{r:Math.round(text.r),g:Math.round(text.g),b:Math.round(text.b),a:1}
+    primary:{r:clamp255(primary.r),g:clamp255(primary.g),b:clamp255(primary.b),a:1},
+    secondary:{r:clamp255(secondary.r),g:clamp255(secondary.g),b:clamp255(secondary.b),a:1},
+    text:{r:clamp255(text.r),g:clamp255(text.g),b:clamp255(text.b),a:1}
   },null,2),[primary,secondary,text])
 
-  const [jsonDirty, setJsonDirty] = useState(false)
+  // JSON box mirrors main options (as requested)
   const [jsonText, setJsonText]   = useState(liveJSON)
-  useEffect(()=>{ if(!jsonDirty) setJsonText(liveJSON) }, [liveJSON, jsonDirty])
+  useEffect(()=>{ setJsonText(liveJSON) }, [liveJSON])
 
   const copy = async str => { try { await navigator.clipboard.writeText(str); alert('Copied!') } catch(e){ console.error(e) } }
 
@@ -154,15 +161,15 @@ export default function PalettePreviewer() {
       const parsed = JSON.parse(jsonText)
       const norm = (c, fallback) => {
         if (!c || typeof c !== 'object') return fallback
-        const r = clamp(Math.round(+c.r || 0),0,255)
-        const g = clamp(Math.round(+c.g || 0),0,255)
-        const b = clamp(Math.round(+c.b || 0),0,255)
+        const r = clamp255(c.r)
+        const g = clamp255(c.g)
+        const b = clamp255(c.b)
         const a = (typeof c.a === 'number') ? Math.max(0, Math.min(1, +c.a)) : 1
         return { r,g,b,a }
       }
-      if ('primary' in parsed)   setPrimary(norm(parsed.primary, primary))
-      if ('secondary' in parsed) setSecondary(norm(parsed.secondary, secondary))
-      if ('text' in parsed)      setText(norm(parsed.text, text))
+      if ('primary' in parsed)   setPrimary(p => ({ ...p, ...norm(parsed.primary, primary) }))
+      if ('secondary' in parsed) setSecondary(p => ({ ...p, ...norm(parsed.secondary, secondary) }))
+      if ('text' in parsed)      setText(p => ({ ...p, ...norm(parsed.text, text) }))
       alert('Applied JSON values to preview.')
     }catch(e){
       alert('Invalid JSON. Expect keys: primary, secondary, text with r,g,b,a numbers.')
@@ -176,37 +183,77 @@ export default function PalettePreviewer() {
     </svg>
   )
 
-  const ColorRow=({label,color,setColor,allowLinkBtn})=>{
-    const id = label.toLowerCase()
-    const toHex  = c => `#${[c.r,c.g,c.b].map(v=>Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0')).join('').toUpperCase()}`
-    const hexToRgb = hex => {
-      const m=/^#?([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(hex)
-      return m?{r:parseInt(m[1],16),g:parseInt(m[2],16),b:parseInt(m[3],16),a:1}:null
-    }
+  // ======= Native color row ABSOLUTE BASTARD =======
+  const ColorRow = ({ label, color, setColor, allowLinkBtn }) => {
+    const id = label.toLowerCase();
+    const colorRef = React.useRef(null);
+
+    // Uncontrolled input: don't bind `value` prop while dialog is open.
+    // Instead, push external updates into the input when color state changes.
+    React.useEffect(() => {
+      if (colorRef.current) {
+        const hex = toHex(color);
+        if (colorRef.current.value !== hex) {
+          colorRef.current.value = hex;
+        }
+      }
+    }, [color.r, color.g, color.b]);
+
+    const commitHex = (hex) => {
+      const rgb = hexToRgbFast(hex);
+      if (!rgb) return;
+      setColor(prev => (
+        prev.r === rgb.r && prev.g === rgb.g && prev.b === rgb.b
+          ? prev
+          : { ...prev, r: rgb.r, g: rgb.g, b: rgb.b }
+      ));
+    };
+
+    // Chrome streams 'input' while dialog is open; Firefox only fires 'change' on OK.
+    const handleInput  = (e) => commitHex(e.target.value);
+    const handleChange = (e) => commitHex(e.target.value);
+
+    const handleChan = (ch) => (e) => {
+      const v = clamp255(e.target.value);
+      setColor(prev => (prev[ch] === v ? prev : { ...prev, [ch]: v }));
+    };
 
     return (
       <div className="color-row row-grid">
         <div className="cr-label">{label}</div>
+
+        {/* Uncontrolled native color input: fully functional in Chrome; OK-once in Firefox */}
         <input
-          type="color" className="color"
-          value={toHex(color)}
-          onChange={e=>{ const rgb=hexToRgb(e.target.value); if(rgb) setColor({ ...color, ...rgb }) }}
+          ref={colorRef}
+          type="color"
+          className="color"
+          defaultValue={toHex(color)}   // <-- uncontrolled
+          onInput={handleInput}         // Chrome live updates
+          onChange={handleChange}       // OK/close everywhere (Firefox relies on this)
+          aria-label={`${label} color`}
         />
-        {['r','g','b'].map(ch=>(
+
+        {/* R / G / B numeric fields — live */}
+        {['r','g','b'].map(ch => (
           <div key={ch} className="cr-chan col">
             <div className="cr-chan-label">{ch.toUpperCase()}</div>
             <input
               className="number"
-              type="number" min="0" max="255"
-              value={Math.round(color[ch])}
-              onChange={e=>setColor({ ...color, [ch]: clamp(Math.round(+e.target.value||0), 0, 255) })}
+              type="number"
+              min="0"
+              max="255"
+              value={Math.round(color[ch] ?? 0)}
+              onInput={handleChan(ch)}
+              onChange={handleChan(ch)}
+              aria-label={`${label} ${ch.toUpperCase()}`}
             />
           </div>
         ))}
+
         {allowLinkBtn && (
           <button
-            className={`icon-button ${activeTarget===id ? 'active' : ''}`}
-            onClick={()=>setActiveTarget(id)}
+            className={`icon-button ${activeTarget === id ? 'active' : ''}`}
+            onClick={() => setActiveTarget(id)}
             title={`Eyedrop to ${label}`}
             aria-label={`Eyedrop ${label}`}
           >
@@ -214,8 +261,9 @@ export default function PalettePreviewer() {
           </button>
         )}
       </div>
-    )
-  }
+    );
+  };
+
 
   const CardRow=({region,caught})=>{
     const names=SPRITES[region]||[]
@@ -247,13 +295,30 @@ export default function PalettePreviewer() {
     return <div className="dex-sil" style={{width:size,height:silH}}/>
   }
 
+  // ----- Layout -----
   return (
     <div style={cssVars}>
       <header className="app-header">
-        <h1>Ilyeana&apos;s Pixelmon Palette Previewer</h1>
+        <img
+          src={import.meta.env.BASE_URL + 'IlyBrandingPokedex.png'}
+          alt="Ilyeana's Palette Helper"
+          className="header-image"
+        />
+        <a
+          href="https://ko-fi.com/ilyeana"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="kofi-button"
+        >
+          <img
+            src={import.meta.env.BASE_URL + 'kofi.png'}
+            alt="Support on Ko-fi"
+            className="kofi-img"
+          />
+        </a>
       </header>
 
-      <div className="grid">
+      <div className="grid" style={{gridTemplateColumns:'2fr 1fr 1fr', gap:16}}>
         {/* Column A */}
         <div className="vstack">
           <div className="dex-panel">
@@ -279,8 +344,8 @@ export default function PalettePreviewer() {
                        onChange={e=>handleImage(e.target.files?.[0])}/>
               </label>
             </div>
-            <div className="checker" style={{padding:'8px'}}>
-              <canvas ref={canvasRef} onClick={onCanvasClick} style={{width:'100%',display:'block'}}/>
+            <div className="checker">
+              <canvas ref={canvasRef} onClick={onCanvasClick} style={{width:'100%'}}/>
             </div>
             <div className="small" style={{marginTop:8}}>Active eyedrop target: <b>{activeTarget}</b></div>
           </div>
@@ -291,7 +356,7 @@ export default function PalettePreviewer() {
           <div className="panel">
             <div className="header"><h3>Main Options</h3></div>
 
-            <div className="small" style={{margin:'4px 0 8px'}}>Label</div>
+            <div className="small" style={{margin:'4px 0 8px'}}>Pokedex Title</div>
             <input className="number" style={{ width: 240, marginBottom: 10 }} type="text" maxLength={20}
                    value={headerLabel} onChange={(e)=> setHeaderLabel(e.target.value)} />
 
@@ -307,14 +372,12 @@ export default function PalettePreviewer() {
               <div className="toggle">
                 <input type="checkbox" id="rules" checked={enforceModRules}
                        onChange={e=>setEnforceModRules(e.target.checked)}/>
-                <label htmlFor="rules">Auto Sync Colours</label>
+                <label htmlFor="rules">AutoSync from Primary</label>
               </div>
               <button className="button" onClick={realignToRules}>Resync</button>
             </div>
 
-            <div className="small manual-hint">Manual Mode <span>(adjust when sync is turned off)</span></div>
-
-            <div className="section-title small">Secondary rule (from Primary)</div>
+            <div className="section-title small">Secondary Colour </div>
             <div className="slider-row small">
               <span className="slider-label">Lighten L%</span>
               <input className="range" type="range" min="-40" max="60" value={lightenPct}
@@ -341,21 +404,19 @@ export default function PalettePreviewer() {
           </div>
         </div>
 
-        {/* Column C: JSON Variables (independent height) */}
+        {/* Column C (JSON) */}
         <div className="vstack col-c">
           <div className="panel export json-values" style={{ paddingBottom: 8 }}>
-            <div className="header">
-              <h3>JSON Variables</h3>
-            </div>
+            <div className="header"><h3>JSON Variables</h3></div>
             <div className="hstack" style={{ marginBottom: 18 }}>
               <button className="button" onClick={()=>copy(jsonText)}>Copy</button>
-              <button className="button" onClick={applyJsonValues}>Apply</button>
+              <button className="button" onClick={applyJsonValues}>Apply Changes</button>
             </div>
             <textarea
               className="codearea fixed"
-              style={{ height: '520px', fontSize: '16px', lineHeight: '22px', padding: '20px', marginBottom: 20 }}
+              style={{ height: '500px', fontSize: '16px', lineHeight: '22px', padding: '20px', marginBottom: 20 }}
               value={jsonText}
-              onChange={e=>{ setJsonText(e.target.value); setJsonDirty(true) }}
+              onChange={e=>{ setJsonText(e.target.value) }}
               spellCheck={false}
               placeholder={`{
   "primary":   {"r":30,"g":116,"b":231,"a":1},
@@ -367,5 +428,53 @@ export default function PalettePreviewer() {
         </div>
       </div>
     </div>
+  )
+}
+
+/* ===== Supporting small components used above ===== */
+
+function CardRow({region,caught}) {
+  const SPRITES = {
+    Kanto: ['bulbasaur', 'charmander', 'squirtle'],
+    Johto: ['chikorita', 'cyndaquil', 'totodile'],
+    Hoenn: ['treecko', 'torchic', 'mudkip'],
+  }
+  const SPRITE_BASE = (import.meta.env.BASE_URL || '/') + 'sprites'
+  const SPRITE_SIZE = 75
+
+  const names=SPRITES[region]||[]
+  const size = SPRITE_SIZE
+  const gap  = 8
+  const pad  = 10
+  const rightWidth = Math.round(size * 3 + gap * 2 + pad * 2)
+  const silH = Math.round(size * 0.78)
+
+  return (
+    <div className="dex-row" style={{'--dex-right-w':`${rightWidth}px`}}>
+      <div className="dex-left">
+        <div className="dex-region">{region}</div>
+        <div className="dex-count">Caught: {caught}</div>
+      </div>
+      <div className="dex-right">
+        {names.map(n=><SpriteOrSilhouette key={n} name={n} size={size} silH={silH} base={SPRITE_BASE}/>)}
+      </div>
+    </div>
+  )
+}
+
+function SpriteOrSilhouette({name,size,silH, base}) {
+  const [err,setErr]=useState(false)
+  const src=`${base}/${name}.png`
+  if(!err){
+    return <img className="dex-sprite-img" width={size} height={size} src={src} alt={name} onError={()=>setErr(true)}/>
+  }
+  return <div className="dex-sil" style={{width:size,height:silH}}/>
+}
+
+function EyeDropIcon({size=16}) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M16.88 3.549a3.25 3.25 0 1 1 4.596 4.596l-2.12 2.12-4.596-4.596 2.12-2.12zM13.94 6.49l4.596 4.596-8.334 8.334a2 2 0 0 1-1.28.58l-3.77.28a.75.75 0 0 1-.8-.8l.28-3.77a2 2 0 0 1 .58-1.28l8.334-8.334z" fill="currentColor"/>
+    </svg>
   )
 }
