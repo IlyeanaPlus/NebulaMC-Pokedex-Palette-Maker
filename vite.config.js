@@ -1,9 +1,15 @@
+// vite.config.js
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-// https://vitejs.dev/config/
+// IMPORTANT: set to your repo name with leading & trailing slashes
+const base = '/NebulaMC-Pokedex-Palette-Maker/'
+
 export default defineConfig({
+  base,
   plugins: [react()],
-  // For GitHub Pages, set BASE path (e.g., '/pokedex-palette-previewer/').
-  base: process.env.VITE_BASE || '/',
+  build: {
+    outDir: 'dist',
+    assetsDir: 'assets',
+  },
 })

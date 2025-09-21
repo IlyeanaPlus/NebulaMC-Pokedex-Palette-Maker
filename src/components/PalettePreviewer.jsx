@@ -20,7 +20,7 @@ export default function PalettePreviewer() {
     Johto: ['chikorita', 'cyndaquil', 'totodile'],
     Hoenn: ['treecko', 'torchic', 'mudkip'],
   }
-  const SPRITE_BASE = '/sprites'
+  const SPRITE_BASE = (import.meta.env.BASE_URL || '/') + 'sprites'
   const SPRITE_SIZE = 75
 
   // ----- Helpers -----
