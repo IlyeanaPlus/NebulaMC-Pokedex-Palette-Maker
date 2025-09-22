@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 
 export default function PalettePreviewer() {
   // ----- State -----
-  // Internal names (kept): primary = Main Colour, secondary = Accent Colour, text = Text Colour
+  // Internals: primary = Main Colour, secondary = Accent Colour, text = Text Colour
   const [primary, setPrimary]     = useState({ r: 30, g: 116, b: 231, a: 1 })   // Main Colour
   const [secondary, setSecondary] = useState({ r: 200, g: 215, b: 255, a: 1 })  // Accent Colour
   const [text, setText]           = useState({ r: 30, g: 116, b: 231, a: 1 })   // Text Colour
@@ -13,13 +13,13 @@ export default function PalettePreviewer() {
   const [satChange,  setSatChange]    = useState(-12)
   const [textThreshold, setTextThreshold] = useState(4.5)
 
-  // Eyedrop target uses stable keys: 'primary' | 'secondary' | 'text'
-  const [activeTarget, setActiveTarget] = useState('primary')
+  // Eyedrop target uses stable keys
+  const [activeTarget, setActiveTarget] = useState('primary') // 'primary' | 'secondary' | 'text'
 
   // ===== Info dialog state =====
   const [infoOpen, setInfoOpen] = useState(false);
   const [infoText, setInfoText] = useState('');
-  const [infoStatus, setInfoStatus] = useState('idle'); // 'idle' | 'loading' | 'ready' | 'error'
+  const [infoStatus, setInfoStatus] = useState('idle');
   const INFO_URL = (import.meta.env.BASE_URL || '/') + 'instructions.txt';
 
   const openInfo = async () => {
@@ -122,14 +122,13 @@ export default function PalettePreviewer() {
 
   // ----- Reference image (static; no zoom/pan/drag) -----
   const canvasRef = useRef(null);
-  const rawCanvasRef = useRef(null); // full-resolution buffer for accurate eyedrop
+  const rawCanvasRef = useRef(null);
 
   const handleImage = (file) => {
     if (!file) return;
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => {
-      // Draw into offscreen raw at native pixels
       const raw = rawCanvasRef.current || (rawCanvasRef.current = document.createElement('canvas'));
       raw.width = img.width;
       raw.height = img.height;
@@ -138,7 +137,6 @@ export default function PalettePreviewer() {
       rctx.clearRect(0, 0, raw.width, raw.height);
       rctx.drawImage(img, 0, 0);
 
-      // Fit visible canvas once
       const cvs = canvasRef.current;
       if (!cvs) return;
       const maxW = 640, maxH = 420;
@@ -192,11 +190,11 @@ export default function PalettePreviewer() {
     ['--c-text']:toRGBA(text)
   }),[primary,primaryEdge,secondary,secondaryEdge,text])
 
-  // ===== JSON export (ordered primary → secondary → text, one value per line, with mapping) =====
-  // Mapping per spec:
-  //   primary   ← Accent Colour (secondary state)
-  //   secondary ← Main Colour   (primary state)
-  //   text      ← Text Colour
+  // ===== JSON export (primary_color → secondary_color → text_color), one value per line =====
+  // Mapping:
+  //   primary_color   ← Accent Colour (secondary state)
+  //   secondary_color ← Main Colour   (primary state)
+  //   text_color      ← Text Colour
   const asRGBA255 = (c) => ({
     red:   Math.max(0, Math.min(255, Math.round(c.r ?? 0))),
     green: Math.max(0, Math.min(255, Math.round(c.g ?? 0))),
@@ -205,23 +203,23 @@ export default function PalettePreviewer() {
   });
 
   const makeJsonString = (main, accent, txt) => {
-    const PRI = asRGBA255(accent); // "primary"
-    const SEC = asRGBA255(main);   // "secondary"
-    const TXT = asRGBA255(txt);    // "text"
+    const PRI = asRGBA255(accent); // primary_color
+    const SEC = asRGBA255(main);   // secondary_color
+    const TXT = asRGBA255(txt);    // text_color
     return `{
-  "primary": {
+  "primary_color": {
     "red": ${PRI.red},
     "green": ${PRI.green},
     "blue": ${PRI.blue},
     "alpha": ${PRI.alpha}
   },
-  "secondary": {
+  "secondary_color": {
     "red": ${SEC.red},
     "green": ${SEC.green},
     "blue": ${SEC.blue},
     "alpha": ${SEC.alpha}
   },
-  "text": {
+  "text_color": {
     "red": ${TXT.red},
     "green": ${TXT.green},
     "blue": ${TXT.blue},
@@ -236,10 +234,7 @@ export default function PalettePreviewer() {
 
   const copy = async str => { try { await navigator.clipboard.writeText(str); alert('Copied!') } catch(e){ console.error(e) } }
 
-  // Ingest same schema, reverse mapping:
-  //   primary   → Accent (secondary state)
-  //   secondary → Main   (primary state)
-  //   text      → Text
+  // Ingest same schema (reverse mapping)
   const applyJsonValues = () => {
     try{
       const parsed = JSON.parse(jsonText)
@@ -254,16 +249,17 @@ export default function PalettePreviewer() {
         return { r,g,b,a: a255/255 }
       }
 
-      const nextSecondary = parsed.primary   ? coerce(parsed.primary,   secondary) : secondary // Accent
-      const nextPrimary   = parsed.secondary ? coerce(parsed.secondary, primary)   : primary   // Main
-      const nextText      = parsed.text      ? coerce(parsed.text,      text)      : text
+      // primary_color → Accent; secondary_color → Main
+      const nextSecondary = parsed.primary_color   ? coerce(parsed.primary_color,   secondary) : secondary
+      const nextPrimary   = parsed.secondary_color ? coerce(parsed.secondary_color, primary)   : primary
+      const nextText      = parsed.text_color      ? coerce(parsed.text_color,      text)      : text
 
       setSecondary(nextSecondary)
       setPrimary(nextPrimary)
       setText(nextText)
       alert('Applied JSON values.')
     }catch(e){
-      alert('Invalid JSON. Expect keys: primary, secondary, text with red/green/blue/alpha (0–255).')
+      alert('Invalid JSON. Expect keys: primary_color, secondary_color, text_color with red/green/blue/alpha (0–255).')
     }
   }
 
@@ -438,7 +434,7 @@ export default function PalettePreviewer() {
               </div>
             </div>
 
-            {/* Sync at the top */}
+            {/* Sync to Main */}
             <div className="field">
               <div className="label-wrap">
                 <div className="title">Sync all to Main</div>
@@ -459,7 +455,7 @@ export default function PalettePreviewer() {
               </div>
             </div>
 
-            {/* Grouped color controls with titles on the left */}
+            {/* Grouped color controls */}
             <div className="field no-label">
               <div className="color-group two-col">
 
@@ -542,7 +538,7 @@ export default function PalettePreviewer() {
             </div>
           </div>
 
-          {/* JSON Variables below (collapsible) */}
+          {/* JSON Variables (collapsible) */}
           <div className={`panel export json-values ${jsonOpen ? '' : 'collapsed'}`} style={{ paddingBottom: jsonOpen ? 8 : 0 }}>
             <div className="header" style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
               <h3 style={{ margin: 0 }}>JSON Variables</h3>
