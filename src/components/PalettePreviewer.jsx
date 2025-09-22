@@ -118,30 +118,16 @@ export default function PalettePreviewer() {
     if(enforceModRules) setText(prev => ({ ...prev, r:primary.r, g:primary.g, b:primary.b }))
   }
 
-  // ----- Reference image with zoom/pan + DPR-accurate eyedrop -----
+  // ----- Reference image (static; no zoom/pan/drag) -----
   const canvasRef = useRef(null);
-  const rawCanvasRef = useRef(null); // full-resolution image buffer
-  const view = useRef({ scale: 1, x: 0, y: 0, min: 0.5, max: 8 });
-  const drag = useRef({ active:false, x:0, y:0 });
-
-  // Track devicePixelRatio for precise pointer mapping
-  const dprRef = useRef(typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1);
-  useEffect(()=>{
-    const update = () => { dprRef.current = window.devicePixelRatio || 1; };
-    window.addEventListener('resize', update);
-    window.addEventListener('orientationchange', update);
-    return () => {
-      window.removeEventListener('resize', update);
-      window.removeEventListener('orientationchange', update);
-    };
-  },[]);
+  const rawCanvasRef = useRef(null); // full-resolution buffer for accurate eyedrop
 
   const handleImage = (file) => {
     if (!file) return;
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => {
-      // draw into offscreen raw canvas at native pixels
+      // Draw into offscreen raw at native pixels
       const raw = rawCanvasRef.current || (rawCanvasRef.current = document.createElement('canvas'));
       raw.width = img.width;
       raw.height = img.height;
@@ -150,7 +136,7 @@ export default function PalettePreviewer() {
       rctx.clearRect(0, 0, raw.width, raw.height);
       rctx.drawImage(img, 0, 0);
 
-      // size visible canvas to fit max box
+      // Fit visible canvas once
       const cvs = canvasRef.current;
       if (!cvs) return;
       const maxW = 640, maxH = 420;
@@ -158,127 +144,40 @@ export default function PalettePreviewer() {
       cvs.width  = Math.round(img.width  * scale);
       cvs.height = Math.round(img.height * scale);
 
-      // reset viewport
-      view.current.scale = 1;
-      view.current.x = 0;
-      view.current.y = 0;
-
-      redraw();
+      const ctx = cvs.getContext('2d');
+      ctx.imageSmoothingEnabled = false;
+      ctx.clearRect(0, 0, cvs.width, cvs.height);
+      ctx.drawImage(img, 0, 0, cvs.width, cvs.height);
     };
     img.src = url;
   };
 
-  const redraw = () => {
-    const cvs = canvasRef.current;
-    const raw = rawCanvasRef.current;
-    if (!cvs || !raw) return;
-    const ctx = cvs.getContext('2d');
-    // Reset any prior transforms and draw with no smoothing
-    ctx.setTransform(1,0,0,1,0,0);
-    ctx.imageSmoothingEnabled = false;
-    ctx.clearRect(0, 0, cvs.width, cvs.height);
-
-    ctx.save();
-    // base scale maps raw->canvas fit
-    const baseScaleX = cvs.width / raw.width;
-    const baseScaleY = cvs.height / raw.height;
-    ctx.translate(view.current.x, view.current.y);
-    ctx.scale(view.current.scale * baseScaleX, view.current.scale * baseScaleY);
-    ctx.drawImage(raw, 0, 0);
-    ctx.restore();
-  };
-
-  // Convert a client pointer to raw image pixel coords (DPR-aware)
-  const canvasToImageCoords = (clientX, clientY) => {
-    const cvs = canvasRef.current, raw = rawCanvasRef.current;
-    if (!cvs || !raw) return { ix: 0, iy: 0 };
-    const rect = cvs.getBoundingClientRect();
-    const dpr = dprRef.current;
-
-    // Pointer in canvas pixel units
-    const cx = (clientX - rect.left) * dpr;
-    const cy = (clientY - rect.top) * dpr;
-
-    const baseScaleX = cvs.width / raw.width;
-    const baseScaleY = cvs.height / raw.height;
-    const s = view.current.scale;
-    const ix = Math.floor((cx - view.current.x) / (s * baseScaleX));
-    const iy = Math.floor((cy - view.current.y) / (s * baseScaleY));
-    return { ix, iy };
-  };
-
-  const onWheel = (e) => {
-    e.preventDefault();
-    const cvs = canvasRef.current, raw = rawCanvasRef.current;
-    if (!cvs || !raw) return;
-
-    const dpr = dprRef.current;
-    const rect = cvs.getBoundingClientRect();
-    const mx = (e.clientX - rect.left) * dpr;
-    const my = (e.clientY - rect.top) * dpr;
-
-    const baseScaleX = cvs.width / raw.width;
-    const baseScaleY = cvs.height / raw.height;
-
-    const s0 = view.current.scale;
-    const factor = e.deltaY > 0 ? 1/1.1 : 1.1;
-
-    // World coords under cursor before zoom
-    const wx = (mx - view.current.x) / (s0 * baseScaleX);
-    const wy = (my - view.current.y) / (s0 * baseScaleY);
-
-    // Apply zoom (clamped)
-    const s1 = Math.min(view.current.max, Math.max(view.current.min, s0 * factor));
-    view.current.scale = s1;
-
-    // Keep the same world point under the cursor
-    view.current.x = mx - wx * s1 * baseScaleX;
-    view.current.y = my - wy * s1 * baseScaleY;
-
-    redraw();
-  };
-
-  const onDown = (e) => {
-    const cvs = canvasRef.current;
-    if (!cvs) return;
-    const rect = cvs.getBoundingClientRect();
-    const dpr = dprRef.current;
-    drag.current.active = true;
-    drag.current.x = (e.clientX - rect.left) * dpr;
-    drag.current.y = (e.clientY - rect.top) * dpr;
-  };
-
-  const onMove = (e) => {
-    if (!drag.current.active) return;
-    const cvs = canvasRef.current;
-    if (!cvs) return;
-    const rect = cvs.getBoundingClientRect();
-    const dpr = dprRef.current;
-    const nx = (e.clientX - rect.left) * dpr;
-    const ny = (e.clientY - rect.top) * dpr;
-    const dx = nx - drag.current.x;
-    const dy = ny - drag.current.y;
-    drag.current.x = nx;
-    drag.current.y = ny;
-
-    view.current.x += dx;
-    view.current.y += dy;
-    redraw();
-  };
-
-  const onUp = () => { drag.current.active = false; };
-
   const onCanvasClick = (e) => {
     const raw = rawCanvasRef.current;
-    if (!raw) return;
-    const { ix, iy } = canvasToImageCoords(e.clientX, e.clientY);
-    if (ix < 0 || iy < 0 || ix >= raw.width || iy >= raw.height) return;
-    const data = raw.getContext('2d').getImageData(ix, iy, 1, 1).data;
+    const cvs = canvasRef.current;
+    if (!raw || !cvs) return;
+    const rect = cvs.getBoundingClientRect();
+    const scaleX = raw.width / cvs.width;
+    const scaleY = raw.height / cvs.height;
+    const x = Math.floor((e.clientX - rect.left) * scaleX);
+    const y = Math.floor((e.clientY - rect.top) * scaleY);
+    if (x < 0 || y < 0 || x >= raw.width || y >= raw.height) return;
+    const data = raw.getContext('2d').getImageData(x, y, 1, 1).data;
     const picked = { r:data[0], g:data[1], b:data[2], a:+(data[3]/255).toFixed(3) };
     if (activeTarget==='primary')   setPrimary(picked);
     if (activeTarget==='secondary') setSecondary(picked);
     if (activeTarget==='text')      setText(picked);
   };
+
+  // ----- JSON panel collapse (persisted) -----
+  const [jsonOpen, setJsonOpen] = useState(true);
+  useEffect(() => {
+    const saved = localStorage.getItem('pp.jsonOpen');
+    if (saved != null) setJsonOpen(saved === '1');
+  }, []);
+  useEffect(() => {
+    localStorage.setItem('pp.jsonOpen', jsonOpen ? '1' : '0');
+  }, [jsonOpen]);
 
   // ----- CSS vars & JSON -----
   const secondaryEdge=useMemo(()=>adjustHsl(secondary,{ dl:-8, ds:-5 }),[secondary])
@@ -460,7 +359,7 @@ export default function PalettePreviewer() {
 
         {/* Column B: Palette Controls */}
         <div className="vstack">
-          <div className="panel palette-controls"> 
+          <div className="panel palette-controls">
             <div className="header" style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
               <h3 style={{ margin: 0 }}>Palette Controls</h3>
               <button
@@ -596,20 +495,38 @@ export default function PalettePreviewer() {
             </div>
           </div>
 
-          {/* JSON Variables below */}
-          <div className="panel export json-values" style={{ paddingBottom: 8 }}>
-            <div className="header"><h3>JSON Variables</h3></div>
-            <div className="hstack" style={{ marginBottom: 18, justifyContent:'center' }}>
-              <button className="button" onClick={()=>copy(jsonText)}>Copy</button>
-              <button className="button" onClick={applyJsonValues}>Apply Changes</button>
+          {/* JSON Variables below (now collapsible) */}
+          <div className={`panel export json-values ${jsonOpen ? '' : 'collapsed'}`} style={{ paddingBottom: jsonOpen ? 8 : 0 }}>
+            <div className="header" style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+              <h3 style={{ margin: 0 }}>JSON Variables</h3>
+              <button
+                className="button"
+                aria-expanded={jsonOpen}
+                aria-controls="json-panel-body"
+                onClick={() => setJsonOpen(o => !o)}
+                title={jsonOpen ? 'Collapse' : 'Expand'}
+                style={{ minWidth: 88 }}
+              >
+                {jsonOpen ? 'Collapse' : 'Expand'}
+              </button>
             </div>
-            <textarea
-              className="codearea fixed"
-              style={{ height: '500px', fontSize: '16px', lineHeight: '22px', padding: '20px', marginBottom: 20 }}
-              value={jsonText}
-              onChange={e=>{ setJsonText(e.target.value) }}
-              spellCheck={false}
-            />
+
+            {jsonOpen && (
+              <div id="json-panel-body">
+                <div className="hstack" style={{ marginBottom: 18, justifyContent:'center' }}>
+                  <button className="button" onClick={()=>copy(jsonText)}>Copy</button>
+                  <button className="button" onClick={applyJsonValues}>Apply Changes</button>
+                </div>
+                  <textarea
+                    className="codearea fixed"
+                    style={{ width:'100%', maxWidth:'100%', height:'500px', fontSize:'16px', lineHeight:'22px', padding:'20px', marginBottom:20, boxSizing:'border-box' }}
+                    value={jsonText}
+                    onChange={e=>{ setJsonText(e.target.value) }}
+                    spellCheck={false}
+                  />
+
+              </div>
+            )}
           </div>
         </div>
 
@@ -646,69 +563,9 @@ export default function PalettePreviewer() {
             <div className="checker">
               <canvas
                 ref={canvasRef}
-                onWheel={onWheel}
-                onMouseDown={onDown}
-                onMouseMove={onMove}
-                onMouseUp={onUp}
-                onMouseLeave={onUp}
                 onClick={onCanvasClick}
                 style={{width:'100%'}}
               />
-            </div>
-
-            {/* Zoom controls (bottom of Reference image) */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingTop: 16 }}>
-              <button
-                className="button"
-                onClick={() => {
-                  view.current.scale = Math.max(view.current.min, view.current.scale / 1.1);
-                  redraw();
-                }}
-              >
-                −
-              </button>
-
-              <input
-                className="zoom-range"
-                type="range"
-                min={Math.round(view.current.min * 100)}
-                max={Math.round(view.current.max * 100)}
-                value={Math.round(view.current.scale * 100)}
-                onChange={(e) => {
-                  view.current.scale = Math.min(
-                    view.current.max,
-                    Math.max(view.current.min, Number(e.target.value) / 100)
-                  );
-                  redraw();
-                }}
-              />
-
-              <button
-                className="button"
-                onClick={() => {
-                  view.current.scale = Math.min(view.current.max, view.current.scale * 1.1);
-                  redraw();
-                }}
-              >
-                +
-              </button>
-
-              <span className="zoom-readout">{Math.round(view.current.scale * 100)}%</span>
-
-              {/* Flex spacer pushes Reset to the far right */}
-              <div style={{ flex: 1 }} />
-
-              <button
-                className="button"
-                onClick={() => {
-                  view.current.scale = 1;
-                  view.current.x = 0;
-                  view.current.y = 0;
-                  redraw();
-                }}
-              >
-                Reset
-              </button>
             </div>
 
             <div className="small" style={{marginTop:8}}>

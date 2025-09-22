@@ -532,3 +532,67 @@ pre{ background:#0a1225; border:1px solid var(--border); border-radius:12px; pad
   top: 50%;
   transform: translateY(-50%);
 }
+
+/* ===== Fixed center columns; elastic side pads ===== */
+:root{
+  /* tune these to your exact design */
+  --col-b: 560px;  /* Palette Controls (center-left) */
+  --col-c: 560px;  /* Preview + Reference (center-right) */
+  --grid-gap: 24px;
+}
+
+/* Your 4-col layout from PalettePreviewer.jsx */
+.grid{
+  display:grid;
+  grid-template-columns:
+    minmax(0, 1fr)    /* left pad grows/shrinks */
+    var(--col-b)      /* fixed width */
+    var(--col-c)      /* fixed width */
+    minmax(0, 1fr);   /* right pad grows/shrinks */
+  gap: var(--grid-gap);
+  align-items:start;
+}
+
+/* Make sure inner columns don't blow past their tracks in Edge/Chromium */
+.grid > *{
+  min-width:0;
+  max-width:100%;
+}
+
+/* Optional: if the viewport is too narrow to fit fixed B+C, stack them cleanly */
+@media (max-width: calc(var(--col-b) + var(--col-c) + var(--grid-gap) * 3)){
+  .grid{
+    grid-template-columns: 1fr; /* stack */
+  }
+  /* keep nice spacing when stacked */
+  .grid > *{ width:100%; }
+}
+
+.grid{
+  display:grid;
+  grid-template-columns:
+    minmax(0,1fr)
+    minmax(560px, var(--col-b))   /* lower bound for B */
+    minmax(440px, var(--col-c))   /* lower bound for C */
+    minmax(0,1fr);
+  gap: var(--grid-gap);
+}
+
+/* Belt-and-suspenders so inner content can’t push C wider */
+.vstack.col-c{
+  inline-size: min(var(--col-c), 100%);
+  max-inline-size: var(--col-c);
+}
+.vstack.col-c > *{ max-inline-size: 100%; }
+
+
+/* Mobile override: stack into one column */
+@media (max-width: calc(var(--col-b) + var(--col-c) + var(--grid-gap) * 3)) {
+  .grid{
+    grid-template-columns: 1fr; /* single column */
+  }
+  .grid > *{
+    grid-column: 1 / -1; /* make each span full width */
+    width: 100%;
+  }
+}
