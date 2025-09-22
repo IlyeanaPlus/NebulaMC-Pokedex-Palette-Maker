@@ -2,9 +2,13 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 
 export default function PalettePreviewer() {
   // ----- State -----
-  const [primary, setPrimary]     = useState({ r: 30, g: 116, b: 231, a: 1 })
-  const [secondary, setSecondary] = useState({ r: 200, g: 215, b: 255, a: 1 })
-  const [text, setText]           = useState({ r: 30, g: 116, b: 231, a: 1 })
+  // Internal names kept the same to minimize churn:
+  //   primary   = Main Colour (UI)
+  //   secondary = Accent Colour (UI)
+  //   text      = Text Colour (UI)
+  const [primary, setPrimary]     = useState({ r: 30, g: 116, b: 231, a: 1 })   // Main Colour
+  const [secondary, setSecondary] = useState({ r: 200, g: 215, b: 255, a: 1 })  // Accent Colour
+  const [text, setText]           = useState({ r: 30, g: 116, b: 231, a: 1 })   // Text Colour
   const [headerLabel, setHeaderLabel] = useState('Pokemon')
 
   const [enforceModRules, setEnforceModRules] = useState(true)
@@ -12,7 +16,7 @@ export default function PalettePreviewer() {
   const [satChange,  setSatChange]    = useState(-12)
   const [textThreshold, setTextThreshold] = useState(4.5)
 
-  const [activeTarget, setActiveTarget] = useState('primary')
+  const [activeTarget, setActiveTarget] = useState('primary') // default eyedrop → Main Colour
 
   // ===== Info dialog state =====
   const [infoOpen, setInfoOpen] = useState(false);
@@ -127,7 +131,6 @@ export default function PalettePreviewer() {
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => {
-      // Draw into offscreen raw at native pixels
       const raw = rawCanvasRef.current || (rawCanvasRef.current = document.createElement('canvas'));
       raw.width = img.width;
       raw.height = img.height;
@@ -136,7 +139,6 @@ export default function PalettePreviewer() {
       rctx.clearRect(0, 0, raw.width, raw.height);
       rctx.drawImage(img, 0, 0);
 
-      // Fit visible canvas once
       const cvs = canvasRef.current;
       if (!cvs) return;
       const maxW = 640, maxH = 420;
@@ -164,8 +166,8 @@ export default function PalettePreviewer() {
     if (x < 0 || y < 0 || x >= raw.width || y >= raw.height) return;
     const data = raw.getContext('2d').getImageData(x, y, 1, 1).data;
     const picked = { r:data[0], g:data[1], b:data[2], a:+(data[3]/255).toFixed(3) };
-    if (activeTarget==='primary')   setPrimary(picked);
-    if (activeTarget==='secondary') setSecondary(picked);
+    if (activeTarget==='primary')   setPrimary(picked);   // Main
+    if (activeTarget==='secondary') setSecondary(picked); // Accent
     if (activeTarget==='text')      setText(picked);
   };
 
@@ -179,7 +181,7 @@ export default function PalettePreviewer() {
     localStorage.setItem('pp.jsonOpen', jsonOpen ? '1' : '0');
   }, [jsonOpen]);
 
-  // ----- CSS vars & JSON -----
+  // ----- CSS vars -----
   const secondaryEdge=useMemo(()=>adjustHsl(secondary,{ dl:-8, ds:-5 }),[secondary])
   const primaryEdge=useMemo(()=>adjustHsl(primary,{ dl:-15, ds:-10 }),[primary])
   const cssVars=useMemo(()=>({
@@ -190,32 +192,79 @@ export default function PalettePreviewer() {
     ['--c-text']:toRGBA(text)
   }),[primary,primaryEdge,secondary,secondaryEdge,text])
 
-  const liveJSON=useMemo(()=>JSON.stringify({
-    primary:{r:clamp255(primary.r),g:clamp255(primary.g),b:clamp255(primary.b),a:1},
-    secondary:{r:clamp255(secondary.r),g:clamp255(secondary.g),b:clamp255(secondary.b),a:1},
-    text:{r:clamp255(text.r),g:clamp255(text.g),b:clamp255(text.b),a:1}
-  },null,2),[primary,secondary,text])
+  // ----- JSON export (ordered primary → secondary → text, one value per line) -----
+  // Mapping per your spec:
+  //   primary_color   ← Accent Colour (secondary state)
+  //   secondary_color ← Main Colour (primary state)
+  //   text_color      ← Text Colour
+  const asRGBA255 = (c) => ({
+    red:   Math.max(0, Math.min(255, Math.round(c.r ?? 0))),
+    green: Math.max(0, Math.min(255, Math.round(c.g ?? 0))),
+    blue:  Math.max(0, Math.min(255, Math.round(c.b ?? 0))),
+    alpha: Math.max(0, Math.min(255, Math.round((c.a ?? 1) * 255))),
+  });
 
+  const makeJsonString = (main, accent, txt) => {
+    const PRI = asRGBA255(accent); // primary_color from Accent
+    const SEC = asRGBA255(main);   // secondary_color from Main
+    const TXT = asRGBA255(txt);
+    return `{
+  "primary_color": {
+    "red": ${PRI.red},
+    "green": ${PRI.green},
+    "blue": ${PRI.blue},
+    "alpha": ${PRI.alpha}
+  },
+  "secondary_color": {
+    "red": ${SEC.red},
+    "green": ${SEC.green},
+    "blue": ${SEC.blue},
+    "alpha": ${SEC.alpha}
+  },
+  "text_color": {
+    "red": ${TXT.red},
+    "green": ${TXT.green},
+    "blue": ${TXT.blue},
+    "alpha": ${TXT.alpha}
+  }
+}`;
+  };
+
+  const liveJSON = useMemo(() => makeJsonString(primary, secondary, text), [primary, secondary, text]);
   const [jsonText, setJsonText]   = useState(liveJSON)
   useEffect(()=>{ setJsonText(liveJSON) }, [liveJSON])
 
   const copy = async str => { try { await navigator.clipboard.writeText(str); alert('Copied!') } catch(e){ console.error(e) } }
 
+  // Ingest the same schema, mapping in reverse
+  //  primary_color   → Accent (secondary state)
+  //  secondary_color → Main (primary state)
+  //  text_color      → Text
   const applyJsonValues = () => {
     try{
       const parsed = JSON.parse(jsonText)
-      const norm = (c, fallback) => {
-        if (!c || typeof c !== 'object') return fallback
-        const r = clamp255(c.r), g = clamp255(c.g), b = clamp255(c.b)
-        const a = (typeof c.a === 'number') ? Math.max(0, Math.min(1, +c.a)) : 1
-        return { r,g,b,a }
+      const getNum = (o,k,d)=> (o && typeof o[k]==='number') ? o[k] : d
+      const clampCh = (n)=> Math.max(0, Math.min(255, Math.round(n)))
+      const coerce = (obj, fallback) => {
+        if (!obj || typeof obj !== 'object') return fallback
+        const r = clampCh(getNum(obj,'red',   fallback.r))
+        const g = clampCh(getNum(obj,'green', fallback.g))
+        const b = clampCh(getNum(obj,'blue',  fallback.b))
+        const a255 = clampCh(getNum(obj,'alpha', Math.round((fallback.a??1)*255)))
+        return { r,g,b,a: a255/255 }
       }
-      if ('primary' in parsed)   setPrimary(p => ({ ...p, ...norm(parsed.primary, primary) }))
-      if ('secondary' in parsed) setSecondary(p => ({ ...p, ...norm(parsed.secondary, secondary) }))
-      if ('text' in parsed)      setText(p => ({ ...p, ...norm(parsed.text, text) }))
-      alert('Applied JSON values to preview.')
+
+      // reverse mapping
+      const nextSecondary = parsed.primary_color   ? coerce(parsed.primary_color,   secondary) : secondary
+      const nextPrimary   = parsed.secondary_color ? coerce(parsed.secondary_color, primary)   : primary
+      const nextText      = parsed.text_color      ? coerce(parsed.text_color,      text)      : text
+
+      setSecondary(nextSecondary)
+      setPrimary(nextPrimary)
+      setText(nextText)
+      alert('Applied JSON values.')
     }catch(e){
-      alert('Invalid JSON. Expect keys: primary, secondary, text with r,g,b,a numbers.')
+      alert('Invalid JSON. Expect keys: primary_color, secondary_color, text_color with red/green/blue/alpha (0–255).')
     }
   }
 
@@ -310,7 +359,6 @@ export default function PalettePreviewer() {
           alt="Ilyeana's Palette Helper"
           className="header-image"
         />
-
         <a
           href="https://ko-fi.com/ilyeana"
           target="_blank"
@@ -351,7 +399,6 @@ export default function PalettePreviewer() {
           </div>
         </div>
       )}
-
 
       {/* 4-column grid: [pad][Palette Controls][preview+ref][pad] */}
       <div className="grid">
@@ -394,8 +441,8 @@ export default function PalettePreviewer() {
             {/* Sync at the top */}
             <div className="field">
               <div className="label-wrap">
-                <div className="title">Sync all to Primary</div>
-                <div className="help">Secondary & Text LOCKED to Primary when checked.</div>
+                <div className="title">Sync all to Main</div>
+                <div className="help">Accent & Text **lock to Main Colour** when checked.</div>
               </div>
               <div className="control sync-row">
                 <label className="toggle" htmlFor="rules">
@@ -416,47 +463,47 @@ export default function PalettePreviewer() {
             <div className="field no-label">
               <div className="color-group two-col">
 
-                {/* Primary */}
+                {/* Main Colour (was Primary) */}
                 <div className="subfield-row">
                   <div className="label-wrap">
-                    <div className="sub-title">Primary Colour</div>
-                    <div className="sub-help">Main brand colour; others can derive when sync is on.</div>
+                    <div className="sub-title">Main Colour</div>
+                    <div className="sub-help">Your main brand colour.</div>
                   </div>
                   <div className="color-row inline">
-                    <ColorRow label="Primary" color={primary} setColor={setPrimary} allowLinkBtn showLabel={false}/>
+                    <ColorRow label="Main Colour" color={primary} setColor={setPrimary} allowLinkBtn showLabel={false}/>
                   </div>
                 </div>
 
-                {/* Secondary */}
+                {/* Accent Colour (was Secondary) */}
                 <div className="subfield-row">
                   <div className="label-wrap">
-                    <div className="sub-title">Secondary Colour</div>
-                    <div className="sub-help">Usually a lighter companion to Primary.</div>
+                    <div className="sub-title">Accent Colour</div>
+                    <div className="sub-help">Usually a lighter or complementary colour.</div>
                   </div>
                   <div className="color-row inline">
-                    <ColorRow label="Secondary" color={secondary} setColor={setSecondary} allowLinkBtn showLabel={false}/>
+                    <ColorRow label="Accent Colour" color={secondary} setColor={setSecondary} allowLinkBtn showLabel={false}/>
                   </div>
                 </div>
 
-                {/* Text */}
+                {/* Text Colour (unchanged) */}
                 <div className="subfield-row">
                   <div className="label-wrap">
                     <div className="sub-title">Text Colour</div>
                     <div className="sub-help">Used for labels; respects min contrast when Sync is off.</div>
                   </div>
                   <div className="color-row inline">
-                    <ColorRow label="Text" color={text} setColor={setText} allowLinkBtn showLabel={false}/>
+                    <ColorRow label="Text Colour" color={text} setColor={setText} allowLinkBtn showLabel={false}/>
                   </div>
                 </div>
 
               </div>
             </div>
 
-            {/* Secondary adjustments */}
+            {/* Accent derivation adjustments */}
             <div className="field">
               <div className="label-wrap">
-                <div className="title">Secondary Adjustments</div>
-                <div className="help">Tweak lightness and saturation of Secondary.</div>
+                <div className="title">Accent Adjustments</div>
+                <div className="help">Tweak lightness and saturation of Accent (derived from Main when synced).</div>
               </div>
               <div className="control">
                 <div className="slider-row small" style={{marginTop:0}}>
@@ -488,14 +535,14 @@ export default function PalettePreviewer() {
                 </div>
                 <div className="small" style={{marginTop:2}}>
                   {enforceModRules
-                    ? 'Using Primary color for Text.'
-                    : `Current contrast vs Primary: ${contrast(text, primary).toFixed(2)}:1`}
+                    ? 'Using Main Colour for Text.'
+                    : `Current contrast vs Main: ${contrast(text, primary).toFixed(2)}:1`}
                 </div>
               </div>
             </div>
           </div>
 
-          {/* JSON Variables below (now collapsible) */}
+          {/* JSON Variables below (collapsible) */}
           <div className={`panel export json-values ${jsonOpen ? '' : 'collapsed'}`} style={{ paddingBottom: jsonOpen ? 8 : 0 }}>
             <div className="header" style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
               <h3 style={{ margin: 0 }}>JSON Variables</h3>
@@ -517,14 +564,13 @@ export default function PalettePreviewer() {
                   <button className="button" onClick={()=>copy(jsonText)}>Copy</button>
                   <button className="button" onClick={applyJsonValues}>Apply Changes</button>
                 </div>
-                  <textarea
-                    className="codearea fixed"
-                    style={{ width:'100%', maxWidth:'100%', height:'500px', fontSize:'16px', lineHeight:'22px', padding:'20px', marginBottom:20, boxSizing:'border-box' }}
-                    value={jsonText}
-                    onChange={e=>{ setJsonText(e.target.value) }}
-                    spellCheck={false}
-                  />
-
+                <textarea
+                  className="codearea fixed"
+                  style={{ width:'100%', maxWidth:'100%', height:'500px', fontSize:'16px', lineHeight:'22px', padding:'20px', marginBottom:20, boxSizing:'border-box' }}
+                  value={jsonText}
+                  onChange={e=>{ setJsonText(e.target.value) }}
+                  spellCheck={false}
+                />
               </div>
             )}
           </div>
@@ -568,9 +614,7 @@ export default function PalettePreviewer() {
               />
             </div>
 
-            <div className="small" style={{marginTop:8}}>
-              Active eyedrop target: <b>{activeTarget}</b>
-            </div>
+      
           </div>
         </div>
 
