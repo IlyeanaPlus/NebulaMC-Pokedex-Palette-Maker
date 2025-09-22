@@ -5,97 +5,164 @@
   --c-secondary-edge: rgba(170,190,230,1);
   --c-text: rgba(25,25,25,1);
 
-  --bg: #0f172a;
-  --fg: #e5e7eb;
-  --panel: #0b1224;
-  --border: #243045;
+  --bg: #0f172a; --fg: #e5e7eb; --panel: #0b1224; --border: #243045;
+
+  /* 4-column grid fractions */
+  --colA: 0.6fr; --colB: 0.9fr; --colC: 0.9fr; --colD: 0.6fr;
+
+  /* Field layout */
+  --label-w: 170px;   /* width of left-side titles */
+  --rgbw: 72px;       /* width for 3-digit number inputs */
 }
 
 /* Base */
 *{box-sizing:border-box}
 html,body,#root{height:100%}
-body{
-  margin:0; background:var(--bg); color:var(--fg);
-  font:14px/1.4 ui-sans-serif,system-ui,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,Helvetica,Arial,sans-serif;
-}
+body{ margin:0; background:var(--bg); color:var(--fg);
+  font:14px/1.4 ui-sans-serif,system-ui,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,Helvetica,Arial,sans-serif; }
 
-/* App header */
-.app-header{
-  background:linear-gradient(180deg,#0d1730,#0b1328);
-  border-bottom:1px solid var(--border);
-  padding:16px 18px;
-  position:sticky; top:0; z-index:10;
-  text-align:center;
-}
+/* Header */
+.app-header{ background:linear-gradient(180deg,#0d1730,#0b1328); border-bottom:1px solid var(--border);
+  padding:16px 18px; position:sticky; top:0; z-index:10; text-align:center; }
 .app-header h1{ margin:0; font-size:18px; letter-spacing:.4px; font-weight:800; color:#dfe7ff; }
 
-/* Grid layout — IMPORTANT: stop column stretching to tallest item */
+/* Grid layout — 4 columns: pad | options | preview | pad */
 .grid{
   display:grid;
-  grid-template-columns: 2fr 1fr 1fr;
-  gap:16px;
-  align-items:start; /* <- key fix so B/C no longer match A's height */
+  grid-template-columns:
+    minmax(0, var(--colA))
+    minmax(0, var(--colB))
+    minmax(0, var(--colC))
+    minmax(0, var(--colD));
+  gap:16px; align-items:start;
+}
+.grid > *,.vstack,.panel{ min-width:0 }
+.codearea.fixed{ max-width:100% }
+
+@media (max-width: 900px){
+  .grid{ grid-template-columns: 1fr; gap:14px; padding:0 12px; }
 }
 
-/* Stacks & panels */
+/* Panels & stacks */
 .vstack{ --stack-gap:12px; --stack-top-offset:10px; display:flex; flex-direction:column; gap:var(--stack-gap); }
 .vstack > *:first-child{ margin-top:var(--stack-top-offset); }
 
 .panel{ background:var(--panel); border:1px solid var(--border); border-radius:16px; padding:16px; }
-.header{display:flex;justify-content:space-between;align-items:center}
+.header{display:flex;justify-content:center;align-items:center}
 .hstack{display:flex;gap:12px;align-items:center}
 .small{font-size:12px;opacity:.8}
 
-/* Column B spacing */
-.col-b{ --stack-gap:10px; }
-.col-b .panel{ padding-top:14px; padding-bottom:14px; }
-.panel.panel-rules{ padding-top:12px; padding-bottom:12px; }
-
-/* Column C JSON panel — independent height; no forced 100% */
-.panel.export.json-values{ display:flex; flex-direction:column; /* padding-bottom set inline or override below */ }
-
-/* Textarea look; no fixed height here (we set it inline for clarity) */
-.codearea.fixed{
-  width:100%;
-  background:#0a1225; color:#dfe7ff;
-  border:1px solid var(--border); border-radius:12px;
-  font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace;
-  /* height/font/line-height/padding are set inline in JSX */
-  resize:none; overflow:auto;
+/* ========= Field layout (titles on left, controls on right) ========= */
+.field{
+  display:grid;
+  grid-template-columns: var(--label-w) 1fr;
+  column-gap: 14px;
+  align-items: center;
+  padding: 8px 0;
 }
+.field .label-wrap{ display:flex; flex-direction:column; align-items:flex-start; }
+.field .title{ font-weight:800; }
+.field .help{ font-size:11px; opacity:.75; margin-top:4px; }
+.field .control{ min-width:0; }
+.field .control.inline{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+
+/* Palette Controls header centered */
+.panel.palette-controls .header {
+  display:flex;
+  justify-content:center;   /* centers h3 inside header */
+  align-items:center;
+}
+.panel.palette-controls .header h3 {
+  margin:0;
+  text-align:center;
+  flex:1;                   /* takes full width so text-align works */
+}
+
+/* JSON panel */
+.panel.export.json-values{ display:flex; flex-direction:column; }
 
 /* Inputs & buttons */
 .button{border:1px solid var(--border);border-radius:8px;padding:6px 10px;cursor:pointer;background:#111a33;color:#dfe7ff}
 .button:hover{background:#0e1730}
-.number{width:82px;padding:8px;border:1px solid var(--border);border-radius:8px;background:#0d1630;color:#cfe2ff}
+.number{padding:8px;border:1px solid var(--border);border-radius:8px;background:#0d1630;color:#cfe2ff;text-align:center;font-variant-numeric:tabular-nums}
 .range{width:100%}
 .color{width:48px;height:32px;border:1px solid var(--border);border-radius:6px;background:#0d1630}
 pre{ background:#0a1225; border:1px solid var(--border); border-radius:12px; padding:10px; overflow:auto; }
 .toggle{display:flex;align-items:center;gap:8px}
 
-/* Titles */
-.panel h1,.panel h2,.panel h3,.panel .header{ margin:0 0 10px 0; }
-
-/* Palette rows */
+/* ===== Palette rows – compact (used inside field.control) ===== */
 .color-row.row-grid{
   display:grid;
-  grid-template-columns: 110px 56px 94px 94px 94px 32px;
-  align-items:end; column-gap:14px; row-gap:6px; padding:10px 0;
+  /* When used standalone it can include a label. Inside fields we hide the label and use this compact variant */
+  grid-template-columns: 110px 56px var(--rgbw) var(--rgbw) var(--rgbw) 32px;
+  align-items:center; column-gap:14px; row-gap:6px; padding:0; min-width:0;
 }
-.cr-label{font-weight:700; color:#dbe7ff; align-self:center}
-.cr-chan.col{display:flex;flex-direction:column;gap:6px}
-.cr-chan-label{font-size:11px;opacity:.75;padding-left:2px}
-.icon-button{ width:28px;height:28px;display:grid;place-items:center;border:1px solid var(--border);border-radius:8px;background:#111a33;color:#dfe7ff;padding:0;cursor:pointer; }
+.color-row.no-label{ grid-template-columns: 56px var(--rgbw) var(--rgbw) var(--rgbw) 32px; }
+
+.cr-label{ font-weight:700; color:#dbe7ff; align-self:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+.cr-chan.col{ display:flex; flex-direction:column; align-items:center; gap:6px; min-width:0; }
+.cr-chan-label{ font-size:11px; opacity:.75; }
+.color-row .number{
+  width:var(--rgbw); max-width:var(--rgbw); min-width:0;
+  appearance:auto; -webkit-appearance:auto; -moz-appearance:number-input;
+}
+.icon-button{ width:28px; height:28px; display:grid; place-items:center; border:1px solid var(--border); border-radius:8px; background:#111a33; color:#dfe7ff; padding:0; cursor:pointer; }
 .icon-button:hover{ background:#0e1730 }
 .icon-button.active{ outline:2px solid #9db4ff; outline-offset:2px }
+@media (max-width: 1200px){ :root{ --rgbw: 68px; } }
 
-/* Sliders */
-.section-title{ font-weight:700; margin:6px 0 4px; }
-.slider-row{ display:flex; gap:12px; align-items:center; margin:6px 0; }
-.slider-row .slider-label{ width:130px; opacity:.85; }
-.rules-top{ justify-content:space-between; align-items:center; margin:6px 0 6px; }
-.manual-hint{ opacity:.85; margin:4px 0 6px; }
-.manual-hint span{ opacity:.7 }
+/* Bordered wrapper for the three color rows */
+.color-group{
+  border:1px solid var(--border);
+  border-radius:12px;
+  background:rgba(255,255,255,0.02);
+  padding:12px;
+  display:grid;
+  gap:12px;
+}
+
+/* Subfield = per-color title + helper + row, inside the group */
+.subfield{
+  display:grid;
+  grid-template-columns: 1fr;     /* stack title/help over the row */
+  row-gap:8px;
+}
+.subfield .sub-title{ font-weight:800; }
+.subfield .sub-help{ font-size:11px; opacity:.75; }
+
+/* Compact color row (no own label), aligned + consistent heights */
+.color-row.compact{
+  display:grid;
+  grid-template-columns: 56px var(--rgbw) var(--rgbw) var(--rgbw) var(--ctrl-h); /* swatch | R | G | B | eyedrop */
+  align-items:center;
+  gap:12px;
+  min-width:0;
+}
+
+/* Make all controls the same height and align nicely */
+.color-row.compact .color{
+  width:56px; height:var(--ctrl-h);
+  border:1px solid var(--border); border-radius:6px;
+  background:#0d1630; padding:0;
+}
+.color-row.compact .number{
+  width:var(--rgbw); height:var(--ctrl-h);
+  padding:8px 10px;
+  border:1px solid var(--border); border-radius:8px;
+  background:#0d1630; color:#cfe2ff;
+  text-align:center; font-variant-numeric:tabular-nums;
+  appearance:auto; -webkit-appearance:auto; -moz-appearance:number-input;
+}
+.color-row.compact .icon-button{
+  width:var(--ctrl-h); height:var(--ctrl-h);
+  display:grid; place-items:center;
+  border:1px solid var(--border); border-radius:8px;
+  background:#111a33; color:#dfe7ff; padding:0; cursor:pointer;
+}
+.color-row.compact .icon-button:hover{ background:#0e1730 }
+
+/* Keep shrink behavior robust inside Column B */
+.color-group, .subfield, .color-row.compact, .color-row.compact > *{ min-width:0; }
 
 /* Preview (Dex) */
 .dex-panel{ background:#EDEFF4; border:1px solid #cfd7e7; border-radius:18px; padding:12px 12px 8px; color:#1f2940; }
@@ -108,14 +175,10 @@ pre{ background:#0a1225; border:1px solid var(--border); border-radius:12px; pad
 .dex-magnify::before{ content:''; position:absolute; width:12px; height:12px; border:2px solid #6c7a95; border-radius:50%; left:6px; top:6px; }
 .dex-magnify::after{ content:''; position:absolute; width:8px; height:2px; background:#6c7a95; right:5px; bottom:5px; transform:rotate(45deg); border-radius:1px; }
 .dex-scroll{ display:grid; gap:10px; padding-right:4px; }
-.dex-row{
-  position:relative;
-  background:linear-gradient(135deg,var(--c-secondary) 0%,var(--c-secondary) 50%,var(--c-primary) 50%,var(--c-primary) 100%);
-  border:1px solid var(--c-secondary-edge);
-  border-radius:14px; padding:10px 0;
+.dex-row{ position:relative; background:linear-gradient(135deg,var(--c-secondary) 0%,var(--c-secondary) 50%,var(--c-primary) 50%,var(--c-primary) 100%);
+  border:1px solid var(--c-secondary-edge); border-radius:14px; padding:10px 0;
   display:grid; grid-template-columns:1fr var(--dex-right-w,186px);
-  align-items:center; overflow:hidden; box-shadow:0 2px 0 rgba(0,0,0,.05);
-}
+  align-items:center; overflow:hidden; box-shadow:0 2px 0 rgba(0,0,0,.05); }
 .dex-left{ padding:0 14px; color:var(--c-text); }
 .dex-region{ font-weight:900; font-size:16px; }
 .dex-count{ opacity:.86; font-size:12px; margin-top:2px; }
@@ -123,76 +186,349 @@ pre{ background:#0a1225; border:1px solid var(--border); border-radius:12px; pad
 .dex-sprite-img{ display:block; image-rendering:pixelated; image-rendering:crisp-edges; background:transparent; border:none; filter: drop-shadow(0 1px 0 rgba(0,0,0,.35)); }
 .dex-sil{ background:#000; border-radius:4px; image-rendering:pixelated; }
 
-/* === Reference image checker === */
+/* Reference image checker */
 .checker{
-  /* checkerboard background */
-  background:
-    conic-gradient(#0e1730 25%, #0b1224 0 50%, #0e1730 0 75%, #0b1224 0) 0 0 / 16px 16px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 8px;
+  background:conic-gradient(#0e1730 25%, #0b1224 0 50%, #0e1730 0 75%, #0b1224 0) 0 0 / 16px 16px;
+  border:1px solid var(--border); border-radius:12px; padding:8px; min-height:220px;
+  display:flex; align-items:center; justify-content:center; overflow:hidden;
+}
+.checker canvas{ display:block; max-width:100%; height:auto; image-rendering:pixelated; image-rendering:crisp-edges; }
 
-  /* visible even with an empty canvas */
-  min-height: 220px;
+/* Ko-fi + header image */
+.kofi-button{ position:absolute; right:10px; bottom:10px; display:inline-block; text-decoration:none; }
+.kofi-img{ width:40px; height:auto; }
+.app-header{ position:sticky; top:0; z-index:10; background:linear-gradient(180deg,#0d1730,#0b1328); border-bottom:1px solid var(--border); height:100px; padding:0 16px; display:flex; justify-content:center; align-items:center; }
+.header-image{ display:block; height:100%; width:auto; max-width:100%; }
+
+/* === Palette Controls: grouped color rows & unified sizing === */
+/* Add/merge this var with your existing :root block */
+:root{
+  --ctrl-h: 36px; /* unified height for swatch, inputs, eyedropper */
+}
+
+/* Full-width field variant when you don't want a left label column */
+.field.no-label{
+  grid-template-columns: 1fr;
+  padding-top: 4px;
+}
+
+/* Bordered wrapper around the three color sections (Primary/Secondary/Text) */
+.color-group{
+  border:1px solid var(--border);
+  border-radius:12px;
+  background:rgba(255,255,255,0.02);
+  padding:12px;
+  display:grid;
+  gap:14px;                /* space between the three subfields */
+  min-width:0;             /* keep shrinkable inside grid col */
+}
+
+/* Each subfield = its own title + helper above the row */
+.subfield{
+  display:grid;
+  grid-template-columns: 1fr;
+  row-gap:8px;
+  min-width:0;
+}
+.subfield .sub-title{ font-weight:800; }
+.subfield .sub-help{ font-size:11px; opacity:.75; }
+
+/* Compact, no-label row layout inside the group:
+   swatch | R | G | B | eyedrop  */
+.color-row.row-grid.no-label{
+  grid-template-columns: 56px var(--rgbw) var(--rgbw) var(--rgbw) var(--ctrl-h);
+  align-items:center;
+  column-gap:12px;
+  row-gap:0;
+  padding:0;
+  min-width:0;
+}
+
+/* Make all row controls the same height */
+.color-row.row-grid.no-label .color{
+  width:56px; height:var(--ctrl-h);
+  border:1px solid var(--border); border-radius:6px;
+  background:#0d1630; padding:0;
+}
+.color-row.row-grid.no-label .number{
+  width:var(--rgbw); height:var(--ctrl-h);
+  padding:8px 10px;
+  border:1px solid var(--border); border-radius:8px;
+  background:#0d1630; color:#cfe2ff;
+  text-align:center; font-variant-numeric:tabular-nums;
+  appearance:auto; -webkit-appearance:auto; -moz-appearance:number-input;
+}
+.color-row.row-grid.no-label .icon-button{
+  width:var(--ctrl-h); height:var(--ctrl-h);
+  display:grid; place-items:center;
+  border:1px solid var(--border); border-radius:8px;
+  background:#111a33; color:#dfe7ff; padding:0; cursor:pointer;
+}
+.color-row.row-grid.no-label .icon-button:hover{ background:#0e1730 }
+
+/* Extra safety so nested items don't force overflow */
+.color-group, .subfield,
+.color-row.row-grid.no-label,
+.color-row.row-grid.no-label > *{ min-width:0; }
+
+/* ================== Bottom-aligned 2-column color group ================== */
+:root{
+  /* unified control height for swatch / rgb inputs / eyedropper */
+  --ctrl-h: 36px;
+}
+
+/* Bordered wrapper that spans titles (left) + controls (right) for all 3 rows */
+.color-group.two-col{
+  border:1px solid var(--border);
+  border-radius:12px;
+  background:rgba(255,255,255,0.02);
+  padding:12px;
+  display:grid;
+  gap:12px;                  /* space between Primary / Secondary / Text rows */
+  min-width:0;
+}
+
+/* Each color row becomes a 2-col grid: [title+help] | [inline controls] */
+.subfield-row{
+  display:grid;
+  grid-template-columns: var(--label-w) 1fr;  /* title column width already in :root */
+  column-gap:14px;
+  align-items:end;            /* <- bottom-align left and right sides */
+  min-width:0;
+}
+
+/* Left side: title + helper stack, pulled to the bottom edge */
+.subfield-row .label-wrap{
+  display:flex; flex-direction:column;
+  align-self:end;            /* <- explicitly bottom */
+}
+.subfield-row .sub-title{ font-weight:800; line-height:1.15; }
+.subfield-row .sub-help{ font-size:11px; opacity:.75; margin-top:4px; }
+
+/* Right side: inline swatch | R | G | B | eyedropper, all same height */
+.color-row.inline{
+  display:grid;
+  grid-template-columns: 56px var(--rgbw) var(--rgbw) var(--rgbw) var(--ctrl-h);
+  gap:12px;
+  align-items:end;            /* <- bottoms align to the same baseline */
+  min-width:0;
+}
+
+/* Controls: same visual height */
+.color-row.inline .color{
+  width:56px; height:var(--ctrl-h);
+  border:1px solid var(--border); border-radius:6px;
+  background:#0d1630; padding:0;
+}
+.color-row.inline .number{
+  width:var(--rgbw); height:var(--ctrl-h);
+  padding:8px 10px;
+  border:1px solid var(--border); border-radius:8px;
+  background:#0d1630; color:#cfe2ff;
+  text-align:center; font-variant-numeric:tabular-nums;
+  appearance:auto; -webkit-appearance:auto; -moz-appearance:number-input;
+}
+.color-row.inline .icon-button{
+  width:var(--ctrl-h); height:var(--ctrl-h);
+  display:grid; place-items:center;
+  border:1px solid var(--border); border-radius:8px;
+  background:#111a33; color:#dfe7ff; padding:0; cursor:pointer;
+}
+.color-row.inline .icon-button:hover{ background:#0e1730 }
+
+/* Ensure nothing forces overflow in Column B */
+.color-group.two-col, .subfield-row, .color-row.inline, .color-row.inline > *{ min-width:0; }
+
+/* ==== Bottom-align color rows; make R/G/B labels overlay (no height cost) ==== */
+/* ======== Palette Controls — tokenized sizing & bottom-aligned rows ======== */
+:root{
+  /* 🔧 quick knobs */
+  --label-w: 160px;    /* left title column width */
+  --rgbw: 68px;        /* width for each R/G/B input (3 digits) */
+  --swatch-w: 48px;    /* color swatch width */
+  --ctrl-h: 32px;      /* unified control height (swatch, numbers, eyedropper) */
+  --icon-w: var(--ctrl-h);  /* eyedropper button width (square) */
+  --field-gap-x: 10px; /* gap between columns/controls */
+}
+
+/* Field rows: keep titles (and their helper) on the left, bottom-aligned */
+.field{
+  display:grid;
+  grid-template-columns: var(--label-w) 1fr;
+  column-gap: var(--field-gap-x);
+  align-items: end;      /* bottom align label stack vs controls */
+  padding: 8px 0;
+}
+.field .label-wrap{ display:flex; flex-direction:column; align-self:end; }
+.field .title{ font-weight:800; }
+.field .help{ font-size:11px; opacity:.75; margin-top:4px; }
+.field .control{ min-width:0; }
+
+/* Grouped border for the 3 color rows (optional — keep if you like the grouping) */
+.color-group.two-col{
+  border:1px solid var(--border);
+  border-radius:12px;
+  background:rgba(255,255,255,.02);
+  padding:12px;
+  display:grid;
+  gap:12px;
+  min-width:0;
+}
+
+/* === ColorRow (no-label variant used in fields) =========================== */
+/* Bottom-aligned swatch | R | G | B | eyedropper, fully driven by tokens */
+.color-row.row-grid.no-label{
+  display:grid;
+  grid-template-columns: var(--swatch-w) var(--rgbw) var(--rgbw) var(--rgbw) var(--icon-w);
+  align-items: end;                /* <-- bottom edge is the visual baseline */
+  column-gap: var(--field-gap-x);
+  row-gap: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+/* Unify heights + widths via tokens (overrides earlier fixed sizes) */
+.color-row.row-grid.no-label .color{
+  width: var(--swatch-w);
+  height: var(--ctrl-h);
+  border:1px solid var(--border);
+  border-radius:6px;
+  background:#0d1630;
+  padding:0;
+}
+.color-row.row-grid.no-label .number{
+  width: var(--rgbw);
+  height: var(--ctrl-h);
+  padding: 8px 10px;
+  border:1px solid var(--border);
+  border-radius:8px;
+  background:#0d1630;
+  color:#cfe2ff;
+  text-align:center;
+  font-variant-numeric: tabular-nums;
+  appearance:auto; -webkit-appearance:auto; -moz-appearance:number-input;
+}
+.color-row.row-grid.no-label .icon-button{
+  width: var(--icon-w);
+  height: var(--icon-w);
+  display:grid;
+  place-items:center;
+  border:1px solid var(--border);
+  border-radius:8px;
+  background:#111a33;
+  color:#dfe7ff;
+  padding:0;
+  cursor:pointer;
+}
+.color-row.row-grid.no-label .icon-button:hover{ background:#0e1730 }
+
+/* Make the tiny R/G/B captions NOT affect row height (overlay) */
+.color-row.row-grid.no-label .cr-chan.col{
+  position:relative;
+  display:block;      /* override flex column from earlier rules */
+  padding-top: 12px;  /* space for the overlay label */
+  gap:0;
+  min-width:0;
+}
+.color-row.row-grid.no-label .cr-chan-label{
+  position:absolute; top:0; left:2px;
+  font-size:11px; line-height:1; opacity:.75;
+  pointer-events:none;
+}
+
+/* Dark theme for JSON textarea */
+.codearea{
+  background:#0a1225;
+  color:#dfe7ff;
+  border:1px solid var(--border);
+  border-radius:12px;
+  outline:none;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+}
+.codearea::placeholder{ color:#9bb0d0; opacity:.75; }
+.codearea:focus{ border-color:#40527a; box-shadow:0 0 0 2px rgba(157,180,255,.25); }
+
+/* Put the toggle on the left and push the Resync button to the far right */
+.control.sync-row{ display:flex; align-items:center; gap:10px; }
+.control.sync-row .button.resync{ margin-left:auto; }
+
+/* Reference image header row: space title left, Upload button right */
+.header.ref-image {
   display: flex;
   align-items: center;
-  justify-content: center;
-  overflow: hidden;
+  justify-content: space-between;
+}
+.header.ref-image h2 {
+  margin: 0;
 }
 
-/* crisp canvas rendering & responsive width */
-.checker canvas{
-  display: block;
-  max-width: 100%;
-  height: auto;             /* preserves aspect ratio */
-  image-rendering: pixelated;
-  image-rendering: crisp-edges;
-}
-
-/* Header image */
-.header-image {
-  display: block;
-  margin: 0 auto;
-  width: auto;           /* keep natural width ratio */
-  max-width: 100%;       /* never overflow horizontally */
-
-  /* 👇 NEW: cap the vertical size */
-  max-height: 90px;     /* adjust until the header isn’t too tall */
-  height: auto;
-}
-
-
-/* Ko-fi button overlay */
-.kofi-button{
-  position:absolute;
-  right:10px;
-  bottom:10px;
-  display:inline-block;
-  text-decoration:none;
-}
-.kofi-img{
-  width:40px;           /* adjust size as needed */
-  height:auto;
-}
-
-.app-header {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  background: linear-gradient(180deg, #0d1730, #0b1328);
-  border-bottom: 1px solid var(--border);
-  height: 100px;     /* 👈 fixed header height */
-  padding: 0 16px;   /* keep horizontal padding */
+/* Reference image header: 3-part flex for centered title */
+.header.ref-image {
   display: flex;
-  justify-content: center;
   align-items: center;
+  justify-content: space-between;
+  position: relative;
+}
+.header.ref-image h3 {
+  margin: 0;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
 }
 
-.header-image {
-  display: block;
-  height: 100%;     /* 👈 fill the header vertically */
-  width: auto;      /* keep natural aspect ratio */
-  max-width: 100%;  /* don’t overflow horizontally on small screens */
+/* Reference image header: keep title centered, button right */
+.header.ref-image {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr; /* left spacer | title | right button */
+  align-items: center;
+  text-align: center;
+}
+.header.ref-image h3 {
+  margin: 0;
+  grid-column: 2; /* ensure it stays in the center cell */
+}
+.header.ref-image .button {
+  grid-column: 3;
+  justify-self: end; /* push Upload to far right */
 }
 
+/* Center the h3 title; pin Upload on the right (robust, width-agnostic) */
+.header.ref-image{
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center; /* centers the h3 regardless of siblings */
+}
 
+.header.ref-image h3{
+  margin: 0;
+}
+
+/* Take the Upload button out of the flow and anchor it right */
+.header.ref-image .button{
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);  /* perfect vertical centering */
+}
+
+/* Add horizontal padding inside the Reference image header */
+.header.ref-image {
+  padding: 0 12px;           /* space on left/right */
+  height: 48px;              /* consistent header bar height */
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;   /* centers the h3 */
+}
+
+.header.ref-image h3 {
+  margin: 0;
+}
+
+.header.ref-image .button {
+  position: absolute;
+  right: 12px;               /* line up with padding */
+  top: 50%;
+  transform: translateY(-50%);
+}

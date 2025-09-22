@@ -1,0 +1,15 @@
+I'm very tired and words should go here but I need a nap, I'll do it later
+
+This is a tool for people who:
+- can code but can't art
+- can art but can't code
+
+With the ability to create custom pokedexes for custom palettes or forms,
+we need to be able to make good colour choices for the UI for each dex. This helps
+us collaborate! 
+
+You can 'Sync' colours to the Primary and just mess around with that, as it follows
+the same 'rules' as the pixelmon palettes (Mega, Shiny, Etc) by picking one colour 
+and adjusting the lightness and saturation to get the secondary 
+
+-OR- you can unsync and play with values manually!
